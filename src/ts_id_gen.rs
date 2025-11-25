@@ -1,5 +1,6 @@
 use std::hash::{DefaultHasher, Hasher};
 
+use cityhash_sys::{CityHash32Hasher, CityHash64Hasher};
 use fxhash::FxHasher64;
 use mur3::Hasher128;
 use xxhash_rust::xxh3::{Xxh3, Xxh3Builder};
@@ -57,6 +58,7 @@ pub type FxTsIdGenerator = TsIdGenerator<FxHasher64>;
 pub type Mur3TsIdGenerator = TsIdGenerator<Hasher128>;
 pub type Xx3TsIdGenerator = TsIdGenerator<Xxh3>;
 pub type Xx64TsIdGenerator = TsIdGenerator<Xxh64>;
+pub type CityHashTsIdGenerator = TsIdGenerator<CityHash32Hasher>;
 
 impl Xx3TsIdGenerator {
     pub fn write_label_names_and_finish<'a>(
@@ -100,6 +102,12 @@ impl SeededHasher for DefaultHasher {
         let mut hasher = DefaultHasher::default();
         hasher.write_u64(seed);
         hasher
+    }
+}
+
+impl SeededHasher for CityHash64Hasher {
+    fn from_seed(seed: u64) -> Self {
+        CityHash64Hasher::with_seed(seed)
     }
 }
 

@@ -1,5 +1,6 @@
 use std::hash::Hasher;
 
+use cityhash_sys::CityHash64Hasher;
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use tsid_bench::read_labels_and_hash;
 use tsid_bench::ts_id_gen::{SeededHasher, TsIdGenerator};
@@ -57,12 +58,17 @@ fn benchmark_xxh64_hasher(c: &mut Criterion) {
     benchmark_hasher::<Xxh64, _>(c, "xxh64", || Xxh64::default());
 }
 
+fn benchmark_cityhash_hasher(c: &mut Criterion) {
+    benchmark_hasher::<CityHash64Hasher, _>(c, "cityhash", || CityHash64Hasher::default());
+}
+
 criterion_group!(
     benches,
     benchmark_default_hasher,
     benchmark_fx_hasher,
     benchmark_mur3_hasher,
     benchmark_xxh3_hasher,
-    benchmark_xxh64_hasher
+    benchmark_xxh64_hasher,
+    benchmark_cityhash_hasher
 );
 criterion_main!(benches);

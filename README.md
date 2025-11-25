@@ -16,6 +16,7 @@ TSID Bench generates time series IDs by hashing label names and values. It's des
 - **Multiple Hash Algorithm Support**: Benchmarks various hash functions including:
   - `xxhash` (xxh3 and xxh64 variants)
   - `fxhash` (fast hash)
+  - `cityhash64` (Rust binding)
   - `mur3` (MurmurHash3)
   - Rust's default hasher
 
