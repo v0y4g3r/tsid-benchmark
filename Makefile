@@ -11,6 +11,13 @@ check: fmt lint
 test:
 	cargo nextest run --no-fail-fast
 
+# Run benchmark
+bench:
+	cargo bench
+
+bench-viz:
+	uv run python scripts/run_bench.py
+
 # Check target
 check:
 	cargo check --workspace --all-targets --all-features

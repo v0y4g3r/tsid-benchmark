@@ -1,0 +1,60 @@
+make[1]: Entering directory '/home/lei/workspace/tsid-bench'
+cargo bench
+
+running 1 test
+test tests::check_collisions ... ignored
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+default                 time:   [65.711 µs 65.939 µs 66.273 µs]
+                        change: [+0.9221% +1.3504% +1.7773%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 6 outliers among 100 measurements (6.00%)
+  1 (1.00%) high mild
+  5 (5.00%) high severe
+
+fxhash                  time:   [51.254 µs 51.325 µs 51.402 µs]
+                        change: [+1.1339% +1.4272% +1.7120%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high severe
+
+mur3                    time:   [158.31 µs 159.08 µs 160.03 µs]
+                        change: [+1.0152% +2.2773% +3.4958%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high severe
+
+xxh3                    time:   [146.69 µs 147.02 µs 147.39 µs]
+                        change: [-4.3426% -3.3875% -2.6087%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 14 outliers among 100 measurements (14.00%)
+  6 (6.00%) high mild
+  8 (8.00%) high severe
+
+xxh64                   time:   [139.29 µs 139.80 µs 140.45 µs]
+                        change: [-1.8705% -1.1823% -0.4692%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high severe
+
+reuse/xx3               time:   [78.114 µs 78.628 µs 79.212 µs]
+                        change: [-4.8084% -4.1622% -3.3352%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 4 outliers among 100 measurements (4.00%)
+  2 (2.00%) high mild
+  2 (2.00%) high severe
+reuse/fxhash            time:   [26.914 µs 27.010 µs 27.145 µs]
+                        change: [-3.2587% -2.2902% -1.4973%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 9 outliers among 100 measurements (9.00%)
+  1 (1.00%) low mild
+  6 (6.00%) high mild
+  2 (2.00%) high severe
+
+make[1]: Leaving directory '/home/lei/workspace/tsid-bench'

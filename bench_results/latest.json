@@ -1,0 +1,47 @@
+{
+  "timestamp": "20251125T232139Z",
+  "benchmarks": [
+    {
+      "name": "default",
+      "min_microseconds": 65.711,
+      "median_microseconds": 65.939,
+      "max_microseconds": 66.273
+    },
+    {
+      "name": "fxhash",
+      "min_microseconds": 51.254,
+      "median_microseconds": 51.325,
+      "max_microseconds": 51.402
+    },
+    {
+      "name": "mur3",
+      "min_microseconds": 158.31,
+      "median_microseconds": 159.08,
+      "max_microseconds": 160.03
+    },
+    {
+      "name": "xxh3",
+      "min_microseconds": 146.69,
+      "median_microseconds": 147.02,
+      "max_microseconds": 147.39
+    },
+    {
+      "name": "xxh64",
+      "min_microseconds": 139.29,
+      "median_microseconds": 139.8,
+      "max_microseconds": 140.45
+    },
+    {
+      "name": "reuse/xx3",
+      "min_microseconds": 78.114,
+      "median_microseconds": 78.628,
+      "max_microseconds": 79.212
+    },
+    {
+      "name": "reuse/fxhash",
+      "min_microseconds": 26.914,
+      "median_microseconds": 27.01,
+      "max_microseconds": 27.145
+    }
+  ]
+}
