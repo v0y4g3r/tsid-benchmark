@@ -1,0 +1,17 @@
+// FlatBuffer schema for encoding label key-value pairs
+// Each row contains pairs of (column_id: u32, value: string)
+
+namespace tsid_bench.fb;
+
+// A single key-value pair where key is the column ID
+table LabelAndColumnId {
+  column_id: uint32;
+  label_value: string;
+}
+
+// A row containing multiple key-value pairs
+table PrimaryKeys {
+  label_values: [LabelAndColumnId];
+}
+
+root_type PrimaryKeys;
