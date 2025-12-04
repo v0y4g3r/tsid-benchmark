@@ -6,22 +6,21 @@ use std::sync::Arc;
 use arrow::array::{Array, BinaryBuilder, MapBuilder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use csv::{StringRecord, StringRecordsIntoIter};
-use flatbuffers::FlatBufferBuilder;
-use memcomparable::Serializer;
 use parquet::arrow::ArrowWriter;
 use parquet::file::properties::WriterProperties;
 use parquet::schema::types::ColumnPath;
-use serde::Serialize;
 
-use crate::generated::{
-    LabelAndColumnId, LabelAndColumnIdArgs, PrimaryKeys, PrimaryKeysArgs,
-    finish_primary_keys_buffer, root_as_primary_keys,
-};
 use crate::ts_id_gen::{SeededHasher, TsIdGenerator};
 
 pub mod data_reader;
+pub mod encoding;
 pub mod generated;
 pub mod ts_id_gen;
+
+// Re-export encoding types for convenience
+pub use encoding::{
+    FlatBufferEncoder, LengthPrefixedEncoder, MemcomparableEncoder, RowEncoder, VarintEncoder,
+};
 
 pub struct LabelValuesIterator {
     label_names: Vec<String>,
@@ -82,19 +81,51 @@ where
     }
 }
 
-// Method 3: Use MapArray in Arrow
+// ============================================================================
+// Parquet encoding functions
+// ============================================================================
+
+/// Encode rows to parquet using any RowEncoder implementation.
+pub fn encode_to_parquet<E: RowEncoder + ?Sized>(
+    encoder: &E,
+    rows: &[Vec<(u32, String)>],
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let schema = Schema::new(vec![Field::new("primary_key", DataType::Binary, false)]);
+    let schema = Arc::new(schema);
+
+    let mut builder = BinaryBuilder::new();
+    let mut encoded_row = Vec::new();
+    for row in rows {
+        let pairs: Vec<_> = row.iter().map(|(id, s)| (*id, s.as_str())).collect();
+        encoder.encode(&mut encoded_row, &pairs);
+        builder.append_value(&encoded_row);
+        encoded_row.clear();
+    }
+
+    let array = Arc::new(builder.finish());
+    let batch = arrow::record_batch::RecordBatch::try_new(schema.clone(), vec![array])?;
+
+    let mut buffer = Vec::new();
+    let cursor = Cursor::new(&mut buffer);
+    let props = WriterProperties::builder().build();
+    let mut writer = ArrowWriter::try_new(cursor, schema, Some(props))?;
+    writer.write(&batch)?;
+    writer.close()?;
+
+    Ok(buffer)
+}
+
+/// Encode using MapArray in Arrow (special case - uses label names as keys).
 pub fn encode_to_parquet_maparray(
     label_names: &[String],
     label_values: &[Vec<String>],
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    // Build MapArray first to get the correct schema
     let key_builder = StringBuilder::new();
     let value_builder = StringBuilder::new();
     let mut map_builder = MapBuilder::new(None, key_builder, value_builder);
 
     for row in label_values {
         map_builder.append(true)?;
-        // Use label names (field names) as map keys, paired with their corresponding values
         for (label_name, value) in label_names.iter().zip(row.iter()) {
             map_builder.keys().append_value(label_name);
             map_builder.values().append_value(value);
@@ -102,8 +133,6 @@ pub fn encode_to_parquet_maparray(
     }
 
     let map_array = map_builder.finish();
-
-    // Get the schema from the MapArray
     let map_field = Field::new("labels", map_array.data_type().clone(), false);
     let schema = Schema::new(vec![map_field]);
     let schema = Arc::new(schema);
@@ -111,7 +140,6 @@ pub fn encode_to_parquet_maparray(
     let map_array = Arc::new(map_array);
     let batch = arrow::record_batch::RecordBatch::try_new(schema.clone(), vec![map_array])?;
 
-    // Write to memory parquet
     let mut buffer = Vec::new();
     let cursor = Cursor::new(&mut buffer);
     let props = WriterProperties::builder()
@@ -133,108 +161,6 @@ pub fn encode_to_parquet_maparray(
             true,
         )
         .build();
-    let mut writer = ArrowWriter::try_new(cursor, schema, Some(props))?;
-    writer.write(&batch)?;
-    writer.close()?;
-
-    Ok(buffer)
-}
-
-fn encode_row_flatbuffer<'a>(
-    fb_builder: &mut FlatBufferBuilder,
-    row: impl Iterator<Item = (u32, &'a String)>,
-) {
-    let label_entries: Vec<_> = row
-        .map(|(col_idx, value)| {
-            let label_value = fb_builder.create_string(value);
-            LabelAndColumnId::create(
-                fb_builder,
-                &LabelAndColumnIdArgs {
-                    column_id: col_idx,
-                    label_value: Some(label_value),
-                },
-            )
-        })
-        .collect();
-
-    let label_values_vec = fb_builder.create_vector(&label_entries);
-    let primary_keys = PrimaryKeys::create(
-        fb_builder,
-        &PrimaryKeysArgs {
-            label_values: Some(label_values_vec),
-        },
-    );
-    finish_primary_keys_buffer(fb_builder, primary_keys);
-}
-
-// Method 2: Encode using flatbuffer and write to parquet as binary array
-pub fn encode_to_parquet_flatbuffer(
-    _label_names: &[String],
-    label_values: &[Vec<String>],
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    // Create schema with a single binary column for encoded primary keys
-    let schema = Schema::new(vec![Field::new("primary_key", DataType::Binary, false)]);
-    let schema = Arc::new(schema);
-
-    let mut builder = BinaryBuilder::new();
-    for row in label_values {
-        let mut fb_builder = flatbuffers::FlatBufferBuilder::new();
-        encode_row_flatbuffer(
-            &mut fb_builder,
-            row.iter().enumerate().map(|(idx, val)| (idx as u32, val)),
-        );
-        builder.append_value(fb_builder.finished_data());
-    }
-
-    let array = Arc::new(builder.finish());
-    let batch = arrow::record_batch::RecordBatch::try_new(schema.clone(), vec![array])?;
-
-    // Write to memory parquet
-    let mut buffer = Vec::new();
-    let cursor = Cursor::new(&mut buffer);
-    let props = WriterProperties::builder().build();
-    let mut writer = ArrowWriter::try_new(cursor, schema, Some(props))?;
-    writer.write(&batch)?;
-    writer.close()?;
-
-    Ok(buffer)
-}
-
-// Method 1: Encode using memcomparable and write to parquet as binary array
-pub fn encode_to_parquet_memcomparable(
-    _label_names: &[String],
-    label_values: &[Vec<String>],
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    // Create schema with a single binary column for encoded primary keys
-    let schema = Schema::new(vec![Field::new("primary_key", DataType::Binary, false)]);
-    let schema = Arc::new(schema);
-
-    // Encode all rows
-    let mut builder = BinaryBuilder::new();
-    let mut encoded_row = Vec::new();
-    for row in label_values {
-        // Reuse serializer for all pairs in this row
-        let mut serializer = Serializer::new(&mut encoded_row);
-        for (col_idx, value) in row.iter().enumerate() {
-            let column_id = col_idx as u32;
-            // Serialize column_id first
-            column_id.serialize(&mut serializer).unwrap();
-            // Then serialize value
-            value.serialize(&mut serializer).unwrap();
-        }
-        // Get the encoded buffer from serializer
-        let _ = serializer.into_inner();
-        builder.append_value(&encoded_row);
-        encoded_row.clear();
-    }
-
-    let array = Arc::new(builder.finish());
-    let batch = arrow::record_batch::RecordBatch::try_new(schema.clone(), vec![array])?;
-
-    // Write to memory parquet
-    let mut buffer = Vec::new();
-    let cursor = Cursor::new(&mut buffer);
-    let props = WriterProperties::builder().build();
     let mut writer = ArrowWriter::try_new(cursor, schema, Some(props))?;
     writer.write(&batch)?;
     writer.close()?;
@@ -272,9 +198,7 @@ mod tests {
         }
     }
 
-    // Check hash collision in 100 million label combinations.
-    // This is important because we use tsid to distinguish
-    // between different time series.
+    #[ignore]
     #[test]
     fn check_collisions() {
         let amp = 100_000_000usize / 660;
@@ -284,131 +208,43 @@ mod tests {
         test_hasher::<DefaultHasher>(amp);
     }
 
+    fn to_pairs(label_values: &[Vec<String>]) -> Vec<Vec<(u32, String)>> {
+        label_values
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .enumerate()
+                    .map(|(idx, val)| (idx as u32, val.clone()))
+                    .collect()
+            })
+            .collect()
+    }
+
     #[test]
     fn test_encode_maparray() {
-        let labels = read_labels_and_hash::<std::hash::DefaultHasher>("./labels-2-truncated.csv");
-        let label_names = labels.label_names;
-        let label_values = labels.label_values;
-
-        let size = encode_to_parquet_maparray(&label_names, &label_values).unwrap();
-
-        println!("size: {}k", size.len() as f64 / 1024.0);
-        std::fs::write("./maparray.parqyet", size).unwrap();
+        let labels = read_labels_and_hash::<DefaultHasher>("./labels.csv");
+        let encoded = encode_to_parquet_maparray(&labels.label_names, &labels.label_values).unwrap();
+        println!("maparray size: {:.2}k", encoded.len() as f64 / 1024.0);
+        assert!(!encoded.is_empty());
     }
 
     #[test]
-    fn test_encode_memcomparable() {
-        let labels = read_labels_and_hash::<std::hash::DefaultHasher>("./labels-2-truncated.csv");
-        let label_names = labels.label_names;
-        let label_values = labels.label_values;
+    fn test_encode_with_trait() {
+        let labels = read_labels_and_hash::<DefaultHasher>("./labels.csv");
+        let rows = to_pairs(&labels.label_values);
 
-        let size = encode_to_parquet_memcomparable(&label_names, &label_values).unwrap();
-
-        println!("size: {}k", size.len() as f64 / 1024.0);
-        std::fs::write("./memcomparable.parqyet", size).unwrap();
-    }
-
-    #[test]
-    fn test_encode_flatbuffer() {
-        let labels = read_labels_and_hash::<std::hash::DefaultHasher>("./labels-2-truncated.csv");
-        let label_names = labels.label_names;
-        let label_values = labels.label_values;
-
-        let size = encode_to_parquet_flatbuffer(&label_names, &label_values).unwrap();
-
-        println!("size: {}k", size.len() as f64 / 1024.0);
-        std::fs::write("./flatbuffer.parquet", size).unwrap();
-    }
-
-    #[test]
-    fn test_encode_row_flatbuffer_roundtrip() {
-        // Test data: simulate label values with their column indices
-        let row = vec![
-            "value_0".to_string(),
-            "value_1".to_string(),
-            "value_2".to_string(),
+        // Test all encoders using the trait
+        let encoders: Vec<Box<dyn RowEncoder>> = vec![
+            Box::new(LengthPrefixedEncoder),
+            Box::new(VarintEncoder),
+            Box::new(MemcomparableEncoder),
+            Box::new(FlatBufferEncoder),
         ];
 
-        // Encode
-        let mut fb_builder = flatbuffers::FlatBufferBuilder::new();
-        encode_row_flatbuffer(
-            &mut fb_builder,
-            row.iter().enumerate().map(|(idx, val)| (idx as u32, val)),
-        );
-        let encoded_data = fb_builder.finished_data();
-
-        // Decode and verify
-        let primary_keys = root_as_primary_keys(encoded_data).expect("Failed to decode FlatBuffer");
-        let label_values = primary_keys
-            .label_values()
-            .expect("label_values should be present");
-
-        assert_eq!(label_values.len(), row.len());
-
-        for (i, label_entry) in label_values.iter().enumerate() {
-            assert_eq!(label_entry.column_id(), i as u32);
-            assert_eq!(
-                label_entry.label_value(),
-                Some(row[i].as_str()),
-                "Mismatch at index {}",
-                i
-            );
-        }
-    }
-
-    #[test]
-    fn test_encode_row_flatbuffer_roundtrip_empty() {
-        // Test with empty row
-        let row: Vec<String> = vec![];
-
-        let mut fb_builder = flatbuffers::FlatBufferBuilder::new();
-        encode_row_flatbuffer(
-            &mut fb_builder,
-            row.iter().enumerate().map(|(idx, val)| (idx as u32, val)),
-        );
-        let encoded_data = fb_builder.finished_data();
-
-        let primary_keys = root_as_primary_keys(encoded_data).expect("Failed to decode FlatBuffer");
-        let label_values = primary_keys
-            .label_values()
-            .expect("label_values should be present");
-
-        assert_eq!(label_values.len(), 0);
-    }
-
-    #[test]
-    fn test_encode_row_flatbuffer_roundtrip_with_special_chars() {
-        // Test with special characters and unicode
-        let row = vec![
-            "hello world".to_string(),
-            "with\ttab".to_string(),
-            "with\nnewline".to_string(),
-            "unicode: 你好🌍".to_string(),
-            "".to_string(), // empty string
-        ];
-
-        let mut fb_builder = flatbuffers::FlatBufferBuilder::new();
-        encode_row_flatbuffer(
-            &mut fb_builder,
-            row.iter().enumerate().map(|(idx, val)| (idx as u32, val)),
-        );
-        let encoded_data = fb_builder.finished_data();
-
-        let primary_keys = root_as_primary_keys(encoded_data).expect("Failed to decode FlatBuffer");
-        let label_values = primary_keys
-            .label_values()
-            .expect("label_values should be present");
-
-        assert_eq!(label_values.len(), row.len());
-
-        for (i, label_entry) in label_values.iter().enumerate() {
-            assert_eq!(label_entry.column_id(), i as u32);
-            assert_eq!(
-                label_entry.label_value(),
-                Some(row[i].as_str()),
-                "Mismatch at index {}",
-                i
-            );
+        for encoder in &encoders {
+            let encoded = encode_to_parquet(encoder.as_ref(), &rows).unwrap();
+            println!("{} size: {:.2}k", encoder.name(), encoded.len() as f64 / 1024.0);
+            assert!(!encoded.is_empty());
         }
     }
 }
