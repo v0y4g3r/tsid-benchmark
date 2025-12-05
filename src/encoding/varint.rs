@@ -15,7 +15,7 @@ impl RowEncoder for VarintEncoder {
         "varint"
     }
 
-    fn encode(&self, buffer: &mut Vec<u8>, row: &[(u32, &str)]) {
+    fn encode(&self, buffer: &mut Vec<u8>, row: &[(u32, String)]) {
         encode_varint(buffer, row.len() as u32);
         for (col_id, value) in row {
             encode_varint(buffer, *col_id);

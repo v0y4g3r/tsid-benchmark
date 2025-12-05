@@ -15,7 +15,7 @@ impl RowEncoder for LengthPrefixedEncoder {
         "length_prefixed"
     }
 
-    fn encode(&self, buffer: &mut Vec<u8>, row: &[(u32, &str)]) {
+    fn encode(&self, buffer: &mut Vec<u8>, row: &[(u32, String)]) {
         buffer.extend_from_slice(&(row.len() as u32).to_le_bytes());
         for (col_id, value) in row {
             buffer.extend_from_slice(&col_id.to_le_bytes());
@@ -28,8 +28,7 @@ impl RowEncoder for LengthPrefixedEncoder {
         let mut result = Vec::new();
         let mut offset = 0;
 
-        let num_entries =
-            u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap()) as usize;
+        let num_entries = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap()) as usize;
         offset += 4;
 
         for _ in 0..num_entries {

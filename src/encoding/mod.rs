@@ -25,7 +25,7 @@ pub trait RowEncoder {
     ///
     /// The buffer is not cleared before encoding, allowing for reuse.
     /// Callers should clear the buffer if needed.
-    fn encode(&self, buffer: &mut Vec<u8>, row: &[(u32, &str)]);
+    fn encode(&self, buffer: &mut Vec<u8>, row: &[(u32, String)]);
 
     /// Decodes a row from the given data.
     ///
@@ -34,7 +34,7 @@ pub trait RowEncoder {
 }
 
 /// Helper to encode a row and return as a new Vec.
-pub fn encode_to_vec<E: RowEncoder>(encoder: &E, row: &[(u32, &str)]) -> Vec<u8> {
+pub fn encode_to_vec<E: RowEncoder>(encoder: &E, row: &[(u32, String)]) -> Vec<u8> {
     let mut buffer = Vec::new();
     encoder.encode(&mut buffer, row);
     buffer
@@ -46,7 +46,11 @@ mod tests {
 
     /// Test helper to run roundtrip tests for any encoder
     pub fn test_roundtrip<E: RowEncoder>(encoder: &E) {
-        let pairs: Vec<(u32, &str)> = vec![(0, "value_0"), (5, "value_5"), (10, "value_10")];
+        let pairs: Vec<(u32, String)> = vec![
+            (0, "value_0".to_owned()),
+            (5, "value_5".to_owned()),
+            (10, "value_10".to_owned()),
+        ];
 
         let mut buffer = Vec::new();
         encoder.encode(&mut buffer, &pairs);
@@ -55,12 +59,12 @@ mod tests {
         assert_eq!(decoded.len(), pairs.len());
         for (i, (col_id, value)) in decoded.iter().enumerate() {
             assert_eq!(*col_id, pairs[i].0);
-            assert_eq!(value, pairs[i].1);
+            assert_eq!(value, &pairs[i].1);
         }
     }
 
     pub fn test_roundtrip_empty<E: RowEncoder>(encoder: &E) {
-        let pairs: Vec<(u32, &str)> = vec![];
+        let pairs: Vec<(u32, String)> = vec![];
 
         let mut buffer = Vec::new();
         encoder.encode(&mut buffer, &pairs);
@@ -70,13 +74,16 @@ mod tests {
     }
 
     pub fn test_roundtrip_special_chars<E: RowEncoder>(encoder: &E) {
-        let pairs: Vec<(u32, &str)> = vec![
+        let pairs: Vec<(u32, String)> = [
             (0, "hello world"),
             (1, "with\ttab"),
             (2, "with\nnewline"),
             (3, "unicode: 你好🌍"),
             (4, ""),
-        ];
+        ]
+        .into_iter()
+        .map(|(col_id, val)| (col_id, val.to_owned()))
+        .collect();
 
         let mut buffer = Vec::new();
         encoder.encode(&mut buffer, &pairs);
@@ -85,18 +92,21 @@ mod tests {
         assert_eq!(decoded.len(), pairs.len());
         for (i, (col_id, value)) in decoded.iter().enumerate() {
             assert_eq!(*col_id, pairs[i].0);
-            assert_eq!(value, pairs[i].1);
+            assert_eq!(value, &pairs[i].1);
         }
     }
 
     pub fn test_roundtrip_large_col_ids<E: RowEncoder>(encoder: &E) {
-        let pairs: Vec<(u32, &str)> = vec![
+        let pairs: Vec<(u32, String)> = [
             (0, "small"),
             (127, "one_byte_max"),
             (128, "two_bytes_min"),
             (16383, "two_bytes_max"),
             (16384, "three_bytes_min"),
-        ];
+        ]
+        .into_iter()
+        .map(|(col_id, val)| (col_id, val.to_owned()))
+        .collect();
 
         let mut buffer = Vec::new();
         encoder.encode(&mut buffer, &pairs);
@@ -105,7 +115,7 @@ mod tests {
         assert_eq!(decoded.len(), pairs.len());
         for (i, (col_id, value)) in decoded.iter().enumerate() {
             assert_eq!(*col_id, pairs[i].0);
-            assert_eq!(value, pairs[i].1);
+            assert_eq!(value, &pairs[i].1);
         }
     }
 }

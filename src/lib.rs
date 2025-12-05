@@ -96,8 +96,7 @@ pub fn encode_to_parquet<E: RowEncoder + ?Sized>(
     let mut builder = BinaryBuilder::new();
     let mut encoded_row = Vec::new();
     for row in rows {
-        let pairs: Vec<_> = row.iter().map(|(id, s)| (*id, s.as_str())).collect();
-        encoder.encode(&mut encoded_row, &pairs);
+        encoder.encode(&mut encoded_row, row);
         builder.append_value(&encoded_row);
         encoded_row.clear();
     }
@@ -223,7 +222,8 @@ mod tests {
     #[test]
     fn test_encode_maparray() {
         let labels = read_labels_and_hash::<DefaultHasher>("./labels.csv");
-        let encoded = encode_to_parquet_maparray(&labels.label_names, &labels.label_values).unwrap();
+        let encoded =
+            encode_to_parquet_maparray(&labels.label_names, &labels.label_values).unwrap();
         println!("maparray size: {:.2}k", encoded.len() as f64 / 1024.0);
         assert!(!encoded.is_empty());
     }
@@ -243,7 +243,11 @@ mod tests {
 
         for encoder in &encoders {
             let encoded = encode_to_parquet(encoder.as_ref(), &rows).unwrap();
-            println!("{} size: {:.2}k", encoder.name(), encoded.len() as f64 / 1024.0);
+            println!(
+                "{} size: {:.2}k",
+                encoder.name(),
+                encoded.len() as f64 / 1024.0
+            );
             assert!(!encoded.is_empty());
         }
     }

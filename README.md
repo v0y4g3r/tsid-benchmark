@@ -31,52 +31,56 @@ All encoding methods accept `&[(u32, String)]` pairs where `u32` is the column I
 
 | Encoding Method | Encoding Time (µs) | File Size (KB) | Encode Rank | Size Rank |
 |-----------------|-------------------|----------------|-------------|-----------|
-| **varint** | 115.18 | 135.31 | 🥇 1st | 2nd |
-| **length_prefixed** | 118.76 | 175.91 | 🥈 2nd | 3rd |
-| **memcomparable** | 183.57 | 199.44 | 🥉 3rd | 4th |
-| **maparray** | 462.67 | 12.35 | 4th | 🥇 1st |
-| **flatbuffer** | 549.19 | 290.14 | 5th | 5th |
+| **length_prefixed** | 102.20 | 175.91 | 🥇 1st | 3rd |
+| **varint** | 108.86 | 135.31 | 🥈 2nd | 2nd |
+| **memcomparable** | 190.69 | 199.44 | 🥉 3rd | 4th |
+| **maparray** | 454.14 | 12.35 | 4th | 🥇 1st |
+| **flatbuffer** | 568.70 | 290.14 | 5th | 5th |
 
 ### Deserialization Performance Results
 
+All decoders allocate owned `String` values during decoding for fair comparison.
+
 | Decoding Method | Decode Time (µs) | Speed Rank |
 |-----------------|------------------|------------|
-| **flatbuffer_zero_copy** | 2.44 | 🥇 1st |
-| **flatbuffer** | 55.82 | 🥈 2nd |
-| **length_prefixed** | 181.87 | 🥉 3rd |
-| **varint** | 194.33 | 4th |
+| **length_prefixed** | 174.94 | 🥇 1st |
+| **varint** | 233.78 | 🥈 2nd |
+| **memcomparable** | 246.77 | 🥉 3rd |
+| **flatbuffer_zero_copy** | 339.51 | 4th |
+| **flatbuffer** | 476.07 | 5th |
 
-> Note: `flatbuffer_zero_copy` only parses the root, while `flatbuffer` iterates through all entries.
-> Other decoders allocate new strings during decoding.
+> Note: `flatbuffer_zero_copy` only parses the root and accesses field references.
+> `flatbuffer` full decode extracts all values into owned strings.
 
 ### Analysis
 
 **Encoding Performance:**
-- **Fastest encoding**: `varint` (115.18 µs) - ~4.8x faster than flatbuffer
+- **Fastest encoding**: `length_prefixed` (102.20 µs) - ~5.6x faster than flatbuffer
 - **Smallest file size**: `maparray` (12.35 KB) - ~11x smaller than varint, thanks to dictionary encoding
-- **Best balance**: `varint` offers excellent speed with good compression
+- **Best balance**: `varint` offers good speed with best compression among simple encoders
 
 **Decoding Performance:**
-- **Fastest decoding**: `flatbuffer_zero_copy` (2.44 µs) - ~75x faster than length_prefixed
-- **Fastest full decode**: `flatbuffer` (55.82 µs) - ~3.3x faster than length_prefixed
-- FlatBuffer's zero-copy design shines in read-heavy workloads
+- **Fastest decoding**: `length_prefixed` (174.94 µs) - simple format is fastest to parse
+- **Slowest decoding**: `flatbuffer` (476.07 µs) - FlatBuffer overhead for full extraction
+- Simple binary formats outperform schema-based formats when full decoding is required
 
 **Trade-offs:**
 
 | Workload | Recommended | Reason |
 |----------|-------------|--------|
-| Write-heavy | `varint` | Fastest encoding, good compression |
-| Read-heavy | `flatbuffer` | Zero-copy access, fastest decoding |
+| Write-heavy | `length_prefixed` | Fastest encoding |
+| Read-heavy | `length_prefixed` | Fastest decoding |
 | Storage-constrained | `maparray` | Best compression with dictionary encoding |
 | Range queries | `memcomparable` | Sortable binary keys |
 | Cross-language | `flatbuffer` | Schema evolution, language bindings |
+| Balanced size/speed | `varint` | Good compression, competitive speed |
 
 #### Summary
 
-- For **write-heavy** workloads: use `varint` or `length_prefixed`
-- For **read-heavy** workloads: use `flatbuffer` (75x faster zero-copy access)
+- For **write-heavy** workloads: use `length_prefixed` or `varint`
+- For **read-heavy** workloads: use `length_prefixed` (fastest full decode)
 - For **storage-constrained** scenarios: use `maparray`
-- For **balanced** read/write: `flatbuffer` offers good encoding speed with excellent decode performance
+- For **balanced** read/write with good compression: use `varint`
 
 ## Features
 

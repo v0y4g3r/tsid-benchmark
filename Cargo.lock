@@ -850,7 +850,7 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 [[package]]
 name = "memcomparable"
 version = "0.2.0"
-source = "git+https://github.com/GreptimeTeam/memcomparable?branch=main#9ea3d6b981bd75417706a79aa10852dadbf84c2d"
+source = "git+https://github.com/v0y4g3r/memcomparable?rev=765d464816fb27dbacb37293896f90e7a1d0bc46#765d464816fb27dbacb37293896f90e7a1d0bc46"
 dependencies = [
  "bytes",
  "serde",

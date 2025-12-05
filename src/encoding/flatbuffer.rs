@@ -5,12 +5,11 @@
 
 use flatbuffers::FlatBufferBuilder;
 
-use crate::generated::{
-    finish_primary_keys_buffer, root_as_primary_keys, LabelAndColumnId, LabelAndColumnIdArgs,
-    PrimaryKeys, PrimaryKeysArgs,
-};
-
 use super::RowEncoder;
+use crate::generated::{
+    LabelAndColumnId, LabelAndColumnIdArgs, PrimaryKeys, PrimaryKeysArgs,
+    finish_primary_keys_buffer, root_as_primary_keys,
+};
 
 /// FlatBuffer encoder for zero-copy deserialization.
 #[derive(Debug, Clone, Copy, Default)]
@@ -21,7 +20,7 @@ impl RowEncoder for FlatBufferEncoder {
         "flatbuffer"
     }
 
-    fn encode(&self, buffer: &mut Vec<u8>, row: &[(u32, &str)]) {
+    fn encode(&self, buffer: &mut Vec<u8>, row: &[(u32, String)]) {
         let mut fb_builder = FlatBufferBuilder::new();
         let label_entries: Vec<_> = row
             .iter()
