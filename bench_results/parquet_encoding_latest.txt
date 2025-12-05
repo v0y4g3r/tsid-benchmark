@@ -1,0 +1,132 @@
+parquet_encoding_length_prefixed file size: 188058 bytes (183.65 KB)
+parquet_encoding_length_prefixed
+                        time:   [65.852 ms 66.459 ms 67.171 ms]
+                        change: [+2.3152% +3.3488% +4.5577%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 6 outliers among 100 measurements (6.00%)
+  2 (2.00%) high mild
+  4 (4.00%) high severe
+
+parquet_encoding_varint file size: 163548 bytes (159.71 KB)
+parquet_encoding_varint time:   [51.448 ms 51.662 ms 51.879 ms]
+                        change: [+3.2441% +3.8188% +4.3586%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+
+parquet_encoding_memcomparable file size: 212785 bytes (207.80 KB)
+parquet_encoding_memcomparable
+                        time:   [81.736 ms 81.925 ms 82.119 ms]
+                        change: [+2.2805% +2.6354% +2.9903%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+
+parquet_encoding_flatbuffer file size: 256283 bytes (250.28 KB)
+parquet_encoding_flatbuffer
+                        time:   [149.07 ms 149.37 ms 149.66 ms]
+                        change: [-1.0568% -0.7526% -0.4385%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) low mild
+
+parquet_encoding_maparray file size: 2972482 bytes (2902.81 KB)
+parquet_encoding_maparray
+                        time:   [125.50 ms 125.83 ms 126.17 ms]
+                        change: [+1.6825% +2.0382% +2.4066%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+
+decode_memcomparable    time:   [49.846 ms 50.012 ms 50.179 ms]
+                        change: [+0.9062% +1.3127% +1.7054%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+
+decode_length_prefixed  time:   [32.337 ms 32.678 ms 33.146 ms]
+                        change: [-3.0778% -2.0316% -0.3362%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 8 outliers among 100 measurements (8.00%)
+  4 (4.00%) high mild
+  4 (4.00%) high severe
+
+decode_varint           time:   [36.747 ms 36.807 ms 36.873 ms]
+                        change: [-0.4395% -0.2403% -0.0376%] (p = 0.02 < 0.05)
+                        Change within noise threshold.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high severe
+
+decode_flatbuffer       time:   [100.78 ms 100.94 ms 101.12 ms]
+                        change: [-0.4893% -0.2324% +0.0234%] (p = 0.08 > 0.05)
+                        No change in performance detected.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+
+decode_flatbuffer_zero_copy
+                        time:   [72.933 ms 73.257 ms 73.611 ms]
+                        change: [-4.2352% -3.7263% -3.1660%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 9 outliers among 100 measurements (9.00%)
+  1 (1.00%) low mild
+  4 (4.00%) high mild
+  4 (4.00%) high severe
+
+    Finished `bench` profile [optimized] target(s) in 0.05s
+     Running benches/parquet_encoding.rs (target/release/deps/parquet_encoding-e36181da40ee5efd)
+Gnuplot not found, using plotters backend
+Benchmarking parquet_encoding_length_prefixed
+Benchmarking parquet_encoding_length_prefixed: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 6.6s, or reduce sample count to 70.
+Benchmarking parquet_encoding_length_prefixed: Collecting 100 samples in estimated 6.5658 s (100 iterations)
+Benchmarking parquet_encoding_length_prefixed: Analyzing
+Benchmarking parquet_encoding_varint
+Benchmarking parquet_encoding_varint: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 5.1s, or reduce sample count to 90.
+Benchmarking parquet_encoding_varint: Collecting 100 samples in estimated 5.1450 s (100 iterations)
+Benchmarking parquet_encoding_varint: Analyzing
+Benchmarking parquet_encoding_memcomparable
+Benchmarking parquet_encoding_memcomparable: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 8.2s, or reduce sample count to 60.
+Benchmarking parquet_encoding_memcomparable: Collecting 100 samples in estimated 8.1811 s (100 iterations)
+Benchmarking parquet_encoding_memcomparable: Analyzing
+Benchmarking parquet_encoding_flatbuffer
+Benchmarking parquet_encoding_flatbuffer: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 15.1s, or reduce sample count to 30.
+Benchmarking parquet_encoding_flatbuffer: Collecting 100 samples in estimated 15.113 s (100 iterations)
+Benchmarking parquet_encoding_flatbuffer: Analyzing
+Benchmarking parquet_encoding_maparray
+Benchmarking parquet_encoding_maparray: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 12.6s, or reduce sample count to 30.
+Benchmarking parquet_encoding_maparray: Collecting 100 samples in estimated 12.644 s (100 iterations)
+Benchmarking parquet_encoding_maparray: Analyzing
+Benchmarking decode_memcomparable
+Benchmarking decode_memcomparable: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 5.0s, or reduce sample count to 90.
+Benchmarking decode_memcomparable: Collecting 100 samples in estimated 5.0200 s (100 iterations)
+Benchmarking decode_memcomparable: Analyzing
+Benchmarking decode_length_prefixed
+Benchmarking decode_length_prefixed: Warming up for 3.0000 s
+Benchmarking decode_length_prefixed: Collecting 100 samples in estimated 6.4796 s (200 iterations)
+Benchmarking decode_length_prefixed: Analyzing
+Benchmarking decode_varint
+Benchmarking decode_varint: Warming up for 3.0000 s
+Benchmarking decode_varint: Collecting 100 samples in estimated 7.4017 s (200 iterations)
+Benchmarking decode_varint: Analyzing
+Benchmarking decode_flatbuffer
+Benchmarking decode_flatbuffer: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 10.1s, or reduce sample count to 40.
+Benchmarking decode_flatbuffer: Collecting 100 samples in estimated 10.126 s (100 iterations)
+Benchmarking decode_flatbuffer: Analyzing
+Benchmarking decode_flatbuffer_zero_copy
+Benchmarking decode_flatbuffer_zero_copy: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 7.4s, or reduce sample count to 60.
+Benchmarking decode_flatbuffer_zero_copy: Collecting 100 samples in estimated 7.3792 s (100 iterations)
+Benchmarking decode_flatbuffer_zero_copy: Analyzing

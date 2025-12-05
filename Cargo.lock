@@ -1297,6 +1297,7 @@ dependencies = [
  "criterion",
  "csv",
  "flatbuffers",
+ "flate2",
  "fxhash",
  "memcomparable",
  "mur3",

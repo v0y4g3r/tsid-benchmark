@@ -47,6 +47,7 @@ benchmarks/data
 *.code-workspace
 
 venv/
+.venv/
 
 # Fuzz tests
 tests-fuzz/artifacts/

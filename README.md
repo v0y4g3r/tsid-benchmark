@@ -1,19 +1,44 @@
-# TSID Bench
+# Time Series ID & Codec Benchmark
 
-A Rust benchmarking project for evaluating hash function performance in time series ID (TSID) generation. This project compares different hash algorithms for generating unique identifiers from label names and values, which is critical for time series databases and monitoring systems.
+A Rust benchmarking project for evaluating:
+1. **TSID Generator**: Hash function performance for time series ID generation
+2. **Primary Key Codec**: Encoding schemes for storing label key-value pairs
 
 ## Overview
 
-TSID Bench generates time series IDs by hashing label names and values. It's designed to help you choose the optimal hash function for your time series use case based on performance and collision characteristics.
+This project provides comprehensive benchmarks for two critical components in time series databases:
 
-## Results
-> Tested on AMD Ryzen 7 7735HS
+- **TSID Generation**: Compares different hash algorithms for generating unique identifiers from label names and values
+- **Primary Key Encoding**: Evaluates various binary encoding schemes for `(column_id, label_value)` pairs stored in Parquet files
+
+---
+
+## TSID Generator Benchmark
+
+Benchmarks hash function performance for generating time series IDs from label names and values.
+
+### Hash Algorithms
+
+- `xxhash` (xxh3 and xxh64 variants)
+- `fxhash` (fast hash)
+- `cityhash64` (Rust binding)
+- `mur3` (MurmurHash3)
+- Rust's default hasher
+
+### Results
+
+> - Tested on AMD Ryzen 7 7735HS
+> - Command: `cargo bench --bench hash_performance`
 
 ![](./bench_results/latest.svg)
 
-## Parquet Encoding Benchmark Results
+---
 
-This benchmark compares different encoding schemes for storing `(column_id: u32, label_value: String)` pairs in Parquet files.
+## Primary Key Codec Benchmark
+
+Compares different encoding schemes for storing `(column_id: u32, label_value: String)` pairs in Parquet files.
+
+![](./bench_results/parquet_encoding_comparison.svg)
 
 ### Encoding Methods
 
@@ -29,25 +54,28 @@ All encoding methods accept `&[(u32, String)]` pairs where `u32` is the column I
 
 ### Encoding Performance Results
 
-| Encoding Method | Encoding Time (µs) | File Size (KB) | Encode Rank | Size Rank |
+> - Benchmarked with ~10K rows from `assets/labels.csv.gz` 
+> - Command: `python scripts/plot_parquet_encoding.py` (runs benchmarks and generates charts)
+
+| Encoding Method | Encoding Time (ms) | File Size (KB) | Encode Rank | Size Rank |
 |-----------------|-------------------|----------------|-------------|-----------|
-| **length_prefixed** | 102.20 | 175.91 | 🥇 1st | 3rd |
-| **varint** | 108.86 | 135.31 | 🥈 2nd | 2nd |
-| **memcomparable** | 190.69 | 199.44 | 🥉 3rd | 4th |
-| **maparray** | 454.14 | 12.35 | 4th | 🥇 1st |
-| **flatbuffer** | 568.70 | 290.14 | 5th | 5th |
+| **varint** | 51.66 | 159.71 | 🥇 1st | 🥇 1st |
+| **length_prefixed** | 66.46 | 183.65 | 🥈 2nd | 2nd |
+| **memcomparable** | 81.92 | 207.80 | 🥉 3rd | 3rd |
+| **maparray** | 125.83 | 2902.81 | 4th | 5th |
+| **flatbuffer** | 149.37 | 250.28 | 5th | 4th |
 
 ### Deserialization Performance Results
 
 All decoders allocate owned `String` values during decoding for fair comparison.
 
-| Decoding Method | Decode Time (µs) | Speed Rank |
+| Decoding Method | Decode Time (ms) | Speed Rank |
 |-----------------|------------------|------------|
-| **length_prefixed** | 174.94 | 🥇 1st |
-| **varint** | 233.78 | 🥈 2nd |
-| **memcomparable** | 246.77 | 🥉 3rd |
-| **flatbuffer_zero_copy** | 339.51 | 4th |
-| **flatbuffer** | 476.07 | 5th |
+| **length_prefixed** | 32.68 | 🥇 1st |
+| **varint** | 36.81 | 🥈 2nd |
+| **memcomparable** | 50.01 | 🥉 3rd |
+| **flatbuffer_zero_copy** | 73.26 | 4th |
+| **flatbuffer** | 100.94 | 5th |
 
 > Note: `flatbuffer_zero_copy` only parses the root and accesses field references.
 > `flatbuffer` full decode extracts all values into owned strings.
@@ -55,45 +83,32 @@ All decoders allocate owned `String` values during decoding for fair comparison.
 ### Analysis
 
 **Encoding Performance:**
-- **Fastest encoding**: `length_prefixed` (102.20 µs) - ~5.6x faster than flatbuffer
-- **Smallest file size**: `maparray` (12.35 KB) - ~11x smaller than varint, thanks to dictionary encoding
-- **Best balance**: `varint` offers good speed with best compression among simple encoders
+- **Fastest encoding**: `varint` (51.66 ms) - ~3x faster than flatbuffer
+- **Smallest file size**: `varint` (159.71 KB) - most compact binary encoding
+- **Best balance**: `varint` offers both fastest encoding and smallest size
 
 **Decoding Performance:**
-- **Fastest decoding**: `length_prefixed` (174.94 µs) - simple format is fastest to parse
-- **Slowest decoding**: `flatbuffer` (476.07 µs) - FlatBuffer overhead for full extraction
+- **Fastest decoding**: `length_prefixed` (32.68 ms) - simple format is fastest to parse
+- **Slowest decoding**: `flatbuffer` (100.94 ms) - FlatBuffer overhead for full extraction
 - Simple binary formats outperform schema-based formats when full decoding is required
 
 **Trade-offs:**
 
 | Workload | Recommended | Reason |
 |----------|-------------|--------|
-| Write-heavy | `length_prefixed` | Fastest encoding |
+| Write-heavy | `varint` | Fastest encoding, smallest size |
 | Read-heavy | `length_prefixed` | Fastest decoding |
-| Storage-constrained | `maparray` | Best compression with dictionary encoding |
+| Balanced | `varint` | Best overall encode speed + size |
 | Range queries | `memcomparable` | Sortable binary keys |
 | Cross-language | `flatbuffer` | Schema evolution, language bindings |
-| Balanced size/speed | `varint` | Good compression, competitive speed |
 
-#### Summary
+### Summary
 
-- For **write-heavy** workloads: use `length_prefixed` or `varint`
-- For **read-heavy** workloads: use `length_prefixed` (fastest full decode)
-- For **storage-constrained** scenarios: use `maparray`
-- For **balanced** read/write with good compression: use `varint`
+- For **write-heavy** workloads: use `varint` (fastest encoding, best compression)
+- For **read-heavy** workloads: use `length_prefixed` (fastest decoding)
+- For **balanced** read/write: use `varint` (good at both, smallest output)
 
-## Features
-
-- **Multiple Hash Algorithm Support**: Benchmarks various hash functions including:
-  - `xxhash` (xxh3 and xxh64 variants)
-  - `fxhash` (fast hash)
-  - `cityhash64` (Rust binding)
-  - `mur3` (MurmurHash3)
-  - Rust's default hasher
-
-- **Collision Testing**: Includes tests to verify hash collision rates across 100 million label combinations
-
-- **Performance Benchmarks**: Comprehensive benchmarks using Criterion for accurate performance measurements
+---
 
 ## Requirements
 
@@ -127,32 +142,60 @@ Run individual benchmark targets:
 ```bash
 cargo bench --bench hash_performance
 cargo bench --bench reuse_label_hash
+cargo bench --bench parquet_encoding
 ```
 
-### Automated Benchmark Script
+### Automated Benchmark Scripts
 
-A convenience script is provided to execute the full benchmark suite, archive the results, and generate a visual summary:
+Convenience scripts are provided to execute benchmarks, archive results, and generate visual summaries.
 
-```bash
-uv run python scripts/run_bench.py
-```
+#### Setup
 
-Outputs are stored under `bench_results/`:
-
-- `latest.txt` – raw Criterion output
-- `latest.json` – parsed benchmark summary (microseconds)
-- `latest.svg` – bar chart of median timings
-
-Install plotting dependencies if needed:
+Create a virtual environment and install dependencies:
 
 ```bash
+uv venv .venv
+source .venv/bin/activate
 uv pip install matplotlib
 ```
 
-Re-render the plot from the latest run without executing benchmarks again:
+#### TSID Generator Benchmark
+
+Run hash performance benchmarks and generate chart:
 
 ```bash
-uv run python scripts/run_bench.py --skip-run
+python scripts/run_bench.py
+```
+
+Outputs:
+- `bench_results/latest.txt` – raw Criterion output
+- `bench_results/latest.json` – parsed benchmark summary (microseconds)
+- `bench_results/latest.svg` – bar chart of median timings
+
+Re-render the plot from the latest run without executing benchmarks:
+
+```bash
+python scripts/run_bench.py --skip-run
+```
+
+#### Primary Key Codec Benchmark
+
+Run encoding/decoding benchmarks and generate charts:
+
+```bash
+python scripts/plot_parquet_encoding.py
+```
+
+Outputs:
+- `bench_results/parquet_encoding_latest.txt` – raw Criterion output
+- `bench_results/parquet_encoding_comparison.svg` – combined chart (encode time, file size, decode time)
+- `bench_results/parquet_encoding_encode.svg` – encoding performance chart
+- `bench_results/parquet_encoding_decode.svg` – decoding performance chart
+
+Re-render charts from the latest run without executing benchmarks:
+
+```bash
+python scripts/plot_parquet_encoding.py --skip-run
 ```
 
 ## Testing

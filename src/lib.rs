@@ -1,11 +1,11 @@
 use std::fs::File;
 use std::hash::Hasher;
-use std::io::Cursor;
+use std::io::{BufReader, Cursor, Read};
 use std::sync::Arc;
 
 use arrow::array::{Array, BinaryBuilder, MapBuilder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
-use csv::{StringRecord, StringRecordsIntoIter};
+use flate2::read::GzDecoder;
 use parquet::arrow::ArrowWriter;
 use parquet::file::properties::WriterProperties;
 use parquet::schema::types::ColumnPath;
@@ -22,62 +22,57 @@ pub use encoding::{
     FlatBufferEncoder, LengthPrefixedEncoder, MemcomparableEncoder, RowEncoder, VarintEncoder,
 };
 
-pub struct LabelValuesIterator {
-    label_names: Vec<String>,
-    label_name_hash: u64,
-    iterator: StringRecordsIntoIter<File>,
-}
-
-impl LabelValuesIterator {
-    pub(crate) fn next(&mut self) -> Option<(&[String], Vec<String>, u64)> {
-        let record = self.iterator.next()?;
-        let record1: StringRecord = record.unwrap();
-        let row = record1.iter().map(|s| s.to_owned()).collect::<Vec<_>>();
-        Some((self.label_names.as_slice(), row, self.label_name_hash))
-    }
-}
-
 pub struct Labels {
     pub label_names: Vec<String>,
     pub label_name_hash: u64,
     pub label_values: Vec<Vec<String>>,
 }
 
-pub fn read_labels_and_hash<H>(path: &str) -> Labels
-where
-    H: Default + Hasher + SeededHasher,
-{
-    let mut iterator = read_labels::<H>(path);
-    let mut values = vec![];
-    while let Some((_, labels, _)) = iterator.next() {
-        values.push(labels);
-    }
-    Labels {
-        label_names: iterator.label_names,
-        label_name_hash: iterator.label_name_hash,
-        label_values: values,
+/// Create a reader from a file path, automatically handling gzip compression.
+///
+/// If the path ends with `.gz`, the file is decompressed using gzip.
+pub fn open_csv_reader(path: &str) -> Box<dyn Read> {
+    let file = File::open(path).expect("Failed to open file");
+    if path.ends_with(".gz") {
+        Box::new(BufReader::new(GzDecoder::new(file)))
+    } else {
+        Box::new(BufReader::new(file))
     }
 }
 
-fn read_labels<H>(path: &str) -> LabelValuesIterator
+/// Read labels from a CSV reader and compute the label name hash.
+pub fn read_labels_and_hash<H>(reader: Box<dyn Read>) -> Labels
 where
     H: Default + Hasher + SeededHasher,
 {
-    let mut result = csv::ReaderBuilder::new().from_path(path).unwrap();
-    let label_names = result.headers().unwrap();
-    let label_names = label_names
+    let mut csv_reader = csv::ReaderBuilder::new().from_reader(reader);
+
+    let label_names: Vec<String> = csv_reader
+        .headers()
+        .expect("Failed to read headers")
         .iter()
         .map(|s| s.to_owned())
-        .collect::<Vec<String>>();
+        .collect();
 
     let mut generator = TsIdGenerator::<H>::default();
     generator.write_label_names(label_names.iter().map(|s| s.as_bytes()));
     let label_name_hash = generator.build_ts_id();
-    let iter = result.into_records();
-    LabelValuesIterator {
+
+    let label_values: Vec<Vec<String>> = csv_reader
+        .records()
+        .map(|record| {
+            record
+                .expect("Failed to read record")
+                .iter()
+                .map(|s| s.to_owned())
+                .collect()
+        })
+        .collect();
+
+    Labels {
         label_names,
         label_name_hash,
-        iterator: iter,
+        label_values,
     }
 }
 
@@ -179,7 +174,7 @@ mod tests {
     use super::*;
 
     fn test_hasher<H: Hasher + Default + SeededHasher>(amp: usize) {
-        let labels = read_labels_and_hash::<H>("./labels.csv");
+        let labels = read_labels_and_hash::<H>(open_csv_reader("./labels.csv"));
         let mut all_hash_codes = HashSet::with_capacity(labels.label_values.len());
 
         for label in labels.label_values.iter() {
@@ -221,7 +216,7 @@ mod tests {
 
     #[test]
     fn test_encode_maparray() {
-        let labels = read_labels_and_hash::<DefaultHasher>("./labels.csv");
+        let labels = read_labels_and_hash::<DefaultHasher>(open_csv_reader("./labels.csv"));
         let encoded =
             encode_to_parquet_maparray(&labels.label_names, &labels.label_values).unwrap();
         println!("maparray size: {:.2}k", encoded.len() as f64 / 1024.0);
@@ -230,7 +225,7 @@ mod tests {
 
     #[test]
     fn test_encode_with_trait() {
-        let labels = read_labels_and_hash::<DefaultHasher>("./labels.csv");
+        let labels = read_labels_and_hash::<DefaultHasher>(open_csv_reader("./labels.csv"));
         let rows = to_pairs(&labels.label_values);
 
         // Test all encoders using the trait
