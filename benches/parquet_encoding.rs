@@ -4,8 +4,10 @@ use tsid_bench::{
     encode_to_parquet, encode_to_parquet_maparray, read_labels_and_hash,
 };
 
-fn prepare_label_data() -> (Vec<String>, Vec<Vec<String>>) {
-    let labels = read_labels_and_hash::<std::hash::DefaultHasher>("./labels.csv");
+const INPUT:&str = "/home/lei/labels-3.csv";
+
+fn prepare_label_data(path: &str) -> (Vec<String>, Vec<Vec<String>>) {
+    let labels = read_labels_and_hash::<std::hash::DefaultHasher>(path);
     let label_names = labels.label_names;
     let label_values = labels.label_values.clone();
     (label_names, label_values)
@@ -25,11 +27,14 @@ fn scale(label_values: Vec<Vec<String>>, scale: usize) -> Vec<Vec<(u32, String)>
     scaled
 }
 
+fn prepare_benchmark_input() -> Vec<Vec<(u32, String)>> {
+    let (_name, value) = prepare_label_data(INPUT);
+    scale(value, 1)
+}
+
 /// Generic encoding benchmark for any RowEncoder implementation.
 fn benchmark_encoder<E: RowEncoder>(c: &mut Criterion, encoder: E) {
-    let (_, values) = prepare_label_data();
-    let rows = scale(values, 10);
-
+    let rows =prepare_benchmark_input();
     let data = encode_to_parquet(&encoder, &rows).unwrap();
     println!(
         "parquet_encoding_{} file size: {} bytes ({:.2} KB)",
@@ -90,7 +95,7 @@ fn benchmark_flatbuffer(c: &mut Criterion) {
 }
 
 fn benchmark_maparray(c: &mut Criterion) {
-    let (label_names, label_values) = prepare_label_data();
+    let (label_names, label_values) = prepare_label_data(INPUT);
 
     let data = encode_to_parquet_maparray(&label_names, &label_values).unwrap();
     println!(
@@ -111,40 +116,35 @@ fn benchmark_maparray(c: &mut Criterion) {
 // ============================================================================
 
 fn benchmark_decode_length_prefixed(c: &mut Criterion) {
-    let (_, values) = prepare_label_data();
-    let rows = scale(values, 10);
+    let rows =prepare_benchmark_input();
     let encoder = LengthPrefixedEncoder;
     let encoded_rows = prepare_encoded_rows(&encoder, &rows);
     benchmark_decoder(c, encoder, &encoded_rows);
 }
 
 fn benchmark_decode_varint(c: &mut Criterion) {
-    let (_, values) = prepare_label_data();
-    let rows = scale(values, 10);
+    let rows =prepare_benchmark_input();
     let encoder = VarintEncoder;
     let encoded_rows = prepare_encoded_rows(&encoder, &rows);
     benchmark_decoder(c, encoder, &encoded_rows);
 }
 
 fn benchmark_decode_flatbuffer(c: &mut Criterion) {
-    let (_, values) = prepare_label_data();
-    let rows = scale(values, 10);
+    let rows =prepare_benchmark_input();
     let encoder = FlatBufferEncoder;
     let encoded_rows = prepare_encoded_rows(&encoder, &rows);
     benchmark_decoder(c, encoder, &encoded_rows);
 }
 
 fn benchmark_decode_memcomparable(c: &mut Criterion) {
-    let (_, values) = prepare_label_data();
-    let rows = scale(values, 10);
+    let rows =prepare_benchmark_input();
     let encoder = MemcomparableEncoder;
     let encoded_rows = prepare_encoded_rows(&encoder, &rows);
     benchmark_decoder(c, encoder, &encoded_rows);
 }
 
 fn benchmark_decode_flatbuffer_zero_copy(c: &mut Criterion) {
-    let (_, values) = prepare_label_data();
-    let rows = scale(values, 10);
+    let rows =prepare_benchmark_input();
     let encoder = FlatBufferEncoder;
     let encoded_rows = prepare_encoded_rows(&encoder, &rows);
 

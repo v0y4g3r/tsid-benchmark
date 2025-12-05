@@ -36,9 +36,10 @@ pub fn read_parquet_files(
     // Build the reader
     let reader = builder.build()?;
 
-    // Read all record batches and collect distinct rows
-    let mut distinct_rows: HashSet<Vec<String>> = HashSet::new();
-
+    // Write distinct rows to CSV
+    let mut writer = csv::Writer::from_path(output_csv_path)?;
+    // Write header
+    writer.write_record(&column_names)?;
     for batch_result in reader {
         let batch = batch_result?;
 
@@ -103,21 +104,8 @@ pub fn read_parquet_files(
                 };
                 row.push(value);
             }
-            distinct_rows.insert(row);
+            writer.write_record(&row)?;
         }
-    }
-
-    // Write distinct rows to CSV
-    let mut writer = csv::Writer::from_path(output_csv_path)?;
-
-    // Write header
-    writer.write_record(&column_names)?;
-
-    // Write distinct rows
-    let mut sorted_rows: Vec<_> = distinct_rows.into_iter().collect();
-    sorted_rows.sort();
-    for row in sorted_rows {
-        writer.write_record(&row)?;
     }
 
     writer.flush()?;
