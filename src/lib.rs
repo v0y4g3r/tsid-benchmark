@@ -174,7 +174,7 @@ mod tests {
     use super::*;
 
     fn test_hasher<H: Hasher + Default + SeededHasher>(amp: usize) {
-        let labels = read_labels_and_hash::<H>(open_csv_reader("./labels.csv"));
+        let labels = read_labels_and_hash::<H>(open_csv_reader("./assets/labels.csv.gz"));
         let mut all_hash_codes = HashSet::with_capacity(labels.label_values.len());
 
         for label in labels.label_values.iter() {
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn test_encode_maparray() {
-        let labels = read_labels_and_hash::<DefaultHasher>(open_csv_reader("./labels.csv"));
+        let labels = read_labels_and_hash::<DefaultHasher>(open_csv_reader("./assets/labels.csv.gz"));
         let encoded =
             encode_to_parquet_maparray(&labels.label_names, &labels.label_values).unwrap();
         println!("maparray size: {:.2}k", encoded.len() as f64 / 1024.0);
@@ -225,7 +225,7 @@ mod tests {
 
     #[test]
     fn test_encode_with_trait() {
-        let labels = read_labels_and_hash::<DefaultHasher>(open_csv_reader("./labels.csv"));
+        let labels = read_labels_and_hash::<DefaultHasher>(open_csv_reader("./assets/labels.csv.gz"));
         let rows = to_pairs(&labels.label_values);
 
         // Test all encoders using the trait

@@ -2,7 +2,7 @@ use std::hash::Hasher;
 
 use cityhash_sys::CityHash64Hasher;
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
-use tsid_bench::read_labels_and_hash;
+use tsid_bench::{open_csv_reader, read_labels_and_hash};
 use tsid_bench::ts_id_gen::{SeededHasher, TsIdGenerator};
 use xxhash_rust::xxh64::Xxh64;
 
@@ -12,7 +12,7 @@ where
     F: Fn() -> H,
 {
     // Read labels from CSV - use DefaultHasher for reading since we just need the data
-    let labels = read_labels_and_hash::<std::hash::DefaultHasher>("./labels.csv");
+    let labels = read_labels_and_hash::<std::hash::DefaultHasher>(open_csv_reader("./assets/unique-lables.csv.gz"));
     let label_names: &Vec<String> = &labels.label_names;
     let label_values: &Vec<Vec<String>> = &labels.label_values;
 
