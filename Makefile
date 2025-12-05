@@ -15,8 +15,20 @@ test:
 bench:
 	cargo bench
 
-bench-viz:
-	uv run python scripts/run_bench.py
+# Run TSID hash benchmark and generate chart
+bench-tsid:
+	.venv/bin/python scripts/run_bench.py
+
+# Run parquet encoding benchmark and generate charts
+bench-codec:
+	.venv/bin/python scripts/plot_parquet_encoding.py
+
+# Re-render charts without running benchmarks
+bench-tsid-plot:
+	.venv/bin/python scripts/run_bench.py --skip-run
+
+bench-codec-plot:
+	.venv/bin/python scripts/plot_parquet_encoding.py --skip-run
 
 # Check target
 check:

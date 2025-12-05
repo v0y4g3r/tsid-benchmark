@@ -28,7 +28,7 @@ Benchmarks hash function performance for generating time series IDs from label n
 ### Results
 
 > - Tested on AMD Ryzen 7 7735HS
-> - Command: `cargo bench --bench hash_performance`
+> - Command: `make bench-tsid`
 
 ![](./bench_results/latest.svg)
 
@@ -55,7 +55,7 @@ All encoding methods accept `&[(u32, String)]` pairs where `u32` is the column I
 ### Encoding Performance Results
 
 > - Benchmarked with ~10K rows from `assets/labels.csv.gz` 
-> - Command: `python scripts/plot_parquet_encoding.py` (runs benchmarks and generates charts)
+> - Command: `make bench-codec`
 
 | Encoding Method | Encoding Time (ms) | File Size (KB) | Encode Rank | Size Rank |
 |-----------------|-------------------|----------------|-------------|-----------|
@@ -151,7 +151,7 @@ Convenience scripts are provided to execute benchmarks, archive results, and gen
 
 #### Setup
 
-Create a virtual environment and install dependencies:
+Create a virtual environment and install dependencies (one-time setup):
 
 ```bash
 uv venv .venv
@@ -164,7 +164,7 @@ uv pip install matplotlib
 Run hash performance benchmarks and generate chart:
 
 ```bash
-python scripts/run_bench.py
+make bench-tsid
 ```
 
 Outputs:
@@ -175,7 +175,7 @@ Outputs:
 Re-render the plot from the latest run without executing benchmarks:
 
 ```bash
-python scripts/run_bench.py --skip-run
+make bench-tsid-plot
 ```
 
 #### Primary Key Codec Benchmark
@@ -183,7 +183,7 @@ python scripts/run_bench.py --skip-run
 Run encoding/decoding benchmarks and generate charts:
 
 ```bash
-python scripts/plot_parquet_encoding.py
+make bench-codec
 ```
 
 Outputs:
@@ -195,7 +195,7 @@ Outputs:
 Re-render charts from the latest run without executing benchmarks:
 
 ```bash
-python scripts/plot_parquet_encoding.py --skip-run
+make bench-codec-plot
 ```
 
 ## Testing
